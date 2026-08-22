@@ -10,64 +10,66 @@ import {
 import { CoffeeQuiz } from "@/components/site/CoffeeQuiz";
 import { cafe, fullAddress, hours } from "@/data/cafe";
 
-const structuredData = {
-  "@context": "https://schema.org",
-  "@type": "CafeOrCoffeeShop",
-  name: cafe.name,
-  description:
-    "Bloom Café in Melbourne — Specialty coffee, all-day brunch, artisan bakery, and cozy ambiance. Good coffee, good food, Good Mood Everyday.",
-  telephone: cafe.phone,
-  email: cafe.email,
-  priceRange: "$$",
-  servesCuisine: ["Coffee", "Brunch", "Bakery", "Breakfast"],
-  address: {
-    "@type": "PostalAddress",
-    streetAddress: cafe.address.street,
-    addressLocality: cafe.address.city,
-    addressRegion: cafe.address.state,
-    postalCode: cafe.address.zip,
-    addressCountry: "AU",
-  },
-  openingHoursSpecification: hours.map((h) => ({
-    "@type": "OpeningHoursSpecification",
-    dayOfWeek: h.day,
-    opens: "07:00",
-    closes: "21:00",
-  })),
-  aggregateRating: {
-    "@type": "AggregateRating",
-    ratingValue: cafe.rating,
-    reviewCount: cafe.reviewCount,
-  },
-};
-
 export const Route = createFileRoute("/")({
-  head: () => ({
-    meta: [
-      { title: "Bloom Café — Good coffee, good food, Good Mood Everyday | Melbourne" },
-      {
-        name: "description",
-        content:
-          "Bloom Café is a cozy sanctuary in Melbourne serving artisanal coffee, fluffy berry pancakes, avocado toast, and decadent cakes. Mon - Sun 7AM - 9PM.",
+  head: () => {
+    const structuredData = {
+      "@context": "https://schema.org",
+      "@type": "CafeOrCoffeeShop",
+      name: cafe.name,
+      description:
+        "Bloom Café in Melbourne — Specialty coffee, all-day brunch, artisan bakery, and cozy ambiance. Good coffee, good food, Good Mood Everyday.",
+      telephone: cafe.phone,
+      email: cafe.email,
+      priceRange: "$$",
+      servesCuisine: ["Coffee", "Brunch", "Bakery", "Breakfast"],
+      address: {
+        "@type": "PostalAddress",
+        streetAddress: cafe.address?.street || "123 Café Street",
+        addressLocality: cafe.address?.city || "Melbourne",
+        addressRegion: cafe.address?.state || "VIC",
+        postalCode: cafe.address?.zip || "3000",
+        addressCountry: "AU",
       },
-      {
-        property: "og:title",
-        content: "Bloom Café — Coffee • Food • Good Times",
+      openingHoursSpecification: hours.map((h) => ({
+        "@type": "OpeningHoursSpecification",
+        dayOfWeek: h.day,
+        opens: "07:00",
+        closes: "21:00",
+      })),
+      aggregateRating: {
+        "@type": "AggregateRating",
+        ratingValue: cafe.rating,
+        reviewCount: cafe.reviewCount,
       },
-      {
-        property: "og:description",
-        content:
-          "Good coffee, good food, Good Mood Everyday. Handcrafted specialty coffee and fresh brunch on Café Street in Melbourne.",
-      },
-      { property: "og:type", content: "website" },
-    ],
-    scripts: [
-      {
-        type: "application/ld+json",
-        children: JSON.stringify(structuredData),
-      },
-    ],
-  }),
+    };
+
+    return {
+      meta: [
+        { title: "Bloom Café — Good coffee, good food, Good Mood Everyday | Melbourne" },
+        {
+          name: "description",
+          content:
+            "Bloom Café is a cozy sanctuary in Melbourne serving artisanal coffee, fluffy berry pancakes, avocado toast, and decadent cakes. Mon - Sun 7AM - 9PM.",
+        },
+        {
+          property: "og:title",
+          content: "Bloom Café — Coffee • Food • Good Times",
+        },
+        {
+          property: "og:description",
+          content:
+            "Good coffee, good food, Good Mood Everyday. Handcrafted specialty coffee and fresh brunch on Café Street in Melbourne.",
+        },
+        { property: "og:type", content: "website" },
+      ],
+      scripts: [
+        {
+          type: "application/ld+json",
+          children: JSON.stringify(structuredData),
+        },
+      ],
+    };
+  },
   component: Index,
 });
 
