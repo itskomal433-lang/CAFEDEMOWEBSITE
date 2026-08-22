@@ -1,0 +1,230 @@
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * Bloom Café design system — warm cream, forest olive, terracotta, soft sage.
+ * High-end editorial typography with Playfair Display, Caveat script, and Plus Jakarta Sans.
+ */
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 16px);
+  --radius-4xl: calc(var(--radius) + 24px);
+  --font-display: "Playfair Display", Georgia, serif;
+  --font-script: "Caveat", "Dancing Script", cursive, sans-serif;
+  --font-sans: "Plus Jakarta Sans", "DM Sans", ui-sans-serif, system-ui, sans-serif;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-cream: var(--cream);
+  --color-sand: var(--sand);
+  --color-forest: var(--forest);
+  --color-terracotta: var(--terracotta);
+  --color-sage: var(--sage);
+  --color-sage-light: var(--sage-light);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+:root {
+  --radius: 1.25rem;
+
+  --cream: #FAF6EE;
+  --sand: #F3ECE0;
+  --forest: #2B3D2E;
+  --terracotta: #D07A60;
+  --sage: #8EA696;
+  --sage-light: #E4ECE6;
+
+  --background: #FAF6EE;
+  --foreground: #253328;
+  --card: #FFFFFF;
+  --card-foreground: #253328;
+  --popover: #FFFFFF;
+  --popover-foreground: #253328;
+  --primary: #2C3E2E;
+  --primary-foreground: #FAF6EE;
+  --secondary: #F3EDE2;
+  --secondary-foreground: #2C3E2E;
+  --muted: #F0EAE0;
+  --muted-foreground: #6D6964;
+  --accent: #D07A60;
+  --accent-foreground: #FFFFFF;
+  --destructive: #B94738;
+  --destructive-foreground: #FAF6EE;
+  --border: #E8DFD3;
+  --input: #E8DFD3;
+  --ring: #2C3E2E;
+
+  --sidebar: #FAF6EE;
+  --sidebar-foreground: #253328;
+  --sidebar-primary: #2C3E2E;
+  --sidebar-primary-foreground: #FAF6EE;
+  --sidebar-accent: #F3EDE2;
+  --sidebar-accent-foreground: #2C3E2E;
+  --sidebar-border: #E8DFD3;
+  --sidebar-ring: #2C3E2E;
+}
+
+.dark {
+  --background: #18201A;
+  --foreground: #F4EFE6;
+  --card: #202B23;
+  --card-foreground: #F4EFE6;
+  --popover: #202B23;
+  --popover-foreground: #F4EFE6;
+  --primary: #E5D7C5;
+  --primary-foreground: #18201A;
+  --secondary: #27352B;
+  --secondary-foreground: #F4EFE6;
+  --muted: #27352B;
+  --muted-foreground: #A8A29A;
+  --accent: #D07A60;
+  --accent-foreground: #FFFFFF;
+  --destructive: #DF6152;
+  --destructive-foreground: #FAF6EE;
+  --border: rgba(255, 255, 255, 0.12);
+  --input: rgba(255, 255, 255, 0.16);
+  --ring: #E5D7C5;
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-display);
+    letter-spacing: -0.015em;
+    font-variant-numeric: lining-nums proportional-nums;
+  }
+}
+
+.font-script {
+  font-family: var(--font-script);
+}
+
+.font-display {
+  font-family: var(--font-display);
+}
+
+.font-sans {
+  font-family: var(--font-sans);
+}
+
+/* Botanical arch frame styling */
+.arch-top {
+  border-top-left-radius: 9999px;
+  border-top-right-radius: 9999px;
+}
+
+.arch-full {
+  border-radius: 9999px 9999px 2rem 2rem;
+}
+
+/* Subtle paper grain overlay */
+@utility grain {
+  position: relative;
+
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.25;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)' opacity='0.14'/%3E%3C/svg%3E");
+  }
+}
+
+@utility reveal {
+  opacity: 0;
+  transform: translateY(18px);
+  transition:
+    opacity 700ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 700ms cubic-bezier(0.22, 1, 0.36, 1);
+
+  &[data-visible="true"] {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Sleek custom scrollbars */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #E8DFD3;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #D07A60;
+}
+
+/* Hide scrollbar utility */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
