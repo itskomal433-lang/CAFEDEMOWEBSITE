@@ -19,6 +19,16 @@ import {
   Bell,
   AlertTriangle,
   X,
+  Eye,
+  EyeOff,
+  Shield,
+  ShieldAlert,
+  ShieldCheck,
+  KeyRound,
+  CheckCircle2,
+  XCircle,
+  HelpCircle,
+  User,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useCart, ActiveOrder } from "@/context/CartContext";
@@ -30,9 +40,20 @@ import { Input } from "@/components/ui/input";
 import { AdminPOS } from "@/components/admin/AdminPOS";
 import { AdminInventory } from "@/components/admin/AdminInventory";
 import { AdminFloorPlan } from "@/components/admin/AdminFloorPlan";
+import { AdminStaffRoster } from "@/components/admin/AdminStaffRoster";
 import { AdminAnalytics } from "@/components/admin/AdminAnalytics";
+import { AdminSecurity } from "@/components/admin/AdminSecurity";
 import { ReceiptModal } from "@/components/admin/ReceiptModal";
 import { AdminNotificationDrawer } from "@/components/admin/AdminNotificationDrawer";
+import {
+  authenticateAdmin,
+  verifyAdminSession,
+  destroyAdminSession,
+  getLockoutStatus,
+  recoverWithRecoveryKey,
+  evaluatePasswordStrength,
+  DEFAULT_MASTER_PASSWORD,
+} from "@/lib/adminAuth";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({
@@ -66,47 +87,34 @@ function playChime() {
 
 function AdminPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
-    if (typeof window !== "undefined") {
-      const search = window.location.search;
-      if (
-        search.includes("auth=true") ||
-        search.includes("token=manager") ||
-        search.includes("key=bloom2025") ||
-        search.includes("pin=1234")
-      ) {
-        sessionStorage.setItem("bloom_admin_auth", "true");
-        return true;
-      }
-      return sessionStorage.getItem("bloom_admin_auth") === "true";
-    }
-    return false;
+    return verifyAdminSession().isValid;
   });
 
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const search = window.location.search;
-      if (
-        search.includes("auth=true") ||
-        search.includes("token=manager") ||
-        search.includes("key=bloom2025") ||
-        search.includes("pin=1234")
-      ) {
-        setIsAuthenticated(true);
-        sessionStorage.setItem("bloom_admin_auth", "true");
-        toast.success("✨ Verified! Logged into Barista & Management Console.");
-      }
-    }
-  }, []);
+  // Login form state
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [capsLockOn, setCapsLockOn] = useState(false);
+  const [lockoutRemaining, setLockoutRemaining] = useState(0);
+  const [attemptsRemaining, setAttemptsRemaining] = useState<number | undefined>(undefined);
 
-  const [pin, setPin] = useState("");
+  // Recovery modal state
+  const [isRecoveryOpen, setIsRecoveryOpen] = useState(false);
+  const [recoveryKey, setRecoveryKey] = useState("");
+  const [recoveryNewUsername, setRecoveryNewUsername] = useState("bloom_admin");
+  const [recoveryNewPassword, setRecoveryNewPassword] = useState("");
+  const [recoveryConfirmPassword, setRecoveryConfirmPassword] = useState("");
+  const [showRecoveryPassword, setShowRecoveryPassword] = useState(false);
+  const [isRecovering, setIsRecovering] = useState(false);
+
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [activeTab, setActiveTab] = useState<
-    "pos" | "kds" | "floor" | "reservations" | "inventory" | "analytics" | "settings"
+    "pos" | "kds" | "floor" | "reservations" | "inventory" | "staff" | "analytics" | "security" | "settings"
   >("pos");
 
   const [selectedReceiptOrder, setSelectedReceiptOrder] = useState<ActiveOrder | null>(null);
   const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
-  const [isClearDataModalOpen, setIsClearDataModalOpen] = useState(false);
   const [isNotifDrawerOpen, setIsNotifDrawerOpen] = useState(false);
   const [orderToCancel, setOrderToCancel] = useState<ActiveOrder | null>(null);
   const [isStaffCancelModalOpen, setIsStaffCancelModalOpen] = useState(false);
@@ -129,6 +137,41 @@ function AdminPage() {
     addNotification,
     unreadAdminCount,
   } = useApp();
+
+  // Lockout countdown timer
+  useEffect(() => {
+    let timer: any;
+    const checkLockout = async () => {
+      const status = await getLockoutStatus();
+      if (status.isLockedOut) {
+        setLockoutRemaining(status.remainingSeconds);
+      }
+    };
+    checkLockout();
+
+    timer = setInterval(() => {
+      setLockoutRemaining((prev) => {
+        if (prev <= 1) return 0;
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, []);
+
+  // Periodic session validity check & auto-lock
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const interval = setInterval(() => {
+      const check = verifyAdminSession();
+      if (!check.isValid) {
+        setIsAuthenticated(false);
+        destroyAdminSession();
+        toast.info("Session locked due to inactivity. Please log in.");
+      }
+    }, 20000);
+    return () => clearInterval(interval);
+  }, [isAuthenticated]);
 
   const handleOpenCancelModal = (order: ActiveOrder) => {
     setOrderToCancel(order);
@@ -167,64 +210,6 @@ function AdminPage() {
 
     setIsStaffCancelModalOpen(false);
     setOrderToCancel(null);
-  };
-
-  const handleClearAllData = (mode: "reset-defaults" | "wipe-all") => {
-    if (mode === "wipe-all") {
-      setMockOrders([]);
-      clearActiveOrder();
-      clearCart();
-    } else {
-      setMockOrders([
-        {
-          orderId: "8492",
-          createdAt: "10:14 AM",
-          items: [
-            {
-              cartItemId: "mock-1",
-              itemId: "flat-white",
-              name: "Melbourne Flat White",
-              basePrice: 4.8,
-              unitPrice: 5.4,
-              quantity: 2,
-              category: "coffee",
-              options: { milk: "Oat Milk", temperature: "Hot", extraShots: 1 },
-            },
-          ],
-          diningType: "dine-in",
-          tableNumber: "06",
-          pickupTime: "Table #06",
-          customerName: "Liam Thompson",
-          customerPhone: "(03) 9876 1122",
-          subtotal: 10.8,
-          discount: 0,
-          tip: 2.0,
-          total: 12.8,
-          status: "received",
-          estimatedMinutes: 6,
-        },
-      ]);
-      clearActiveOrder();
-      clearCart();
-    }
-
-    resetAllAppData();
-
-    if (typeof window !== "undefined") {
-      try {
-        localStorage.removeItem("bloom_floor_plan");
-        localStorage.removeItem("bloom_inventory");
-        localStorage.removeItem("bloom_staff_roster");
-        localStorage.removeItem("bloom_duty_checklist");
-      } catch {}
-    }
-
-    setIsClearDataModalOpen(false);
-    toast.success(
-      mode === "wipe-all"
-        ? "🧹 Complete Database Purge: All orders, tickets & records wiped!"
-        : "✨ All Café Data Restored to Clean Demo Defaults!"
-    );
   };
 
   // Mock past orders list merged with active order for full KDS demo
@@ -313,21 +298,93 @@ function AdminPage() {
     (o) => o.status !== "completed" && o.status !== "cancelled"
   );
 
-  const handleLogin = (e?: React.FormEvent) => {
+  const handleLogin = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (pin === "1234" || pin === "admin" || pin === "") {
-      setIsAuthenticated(true);
-      sessionStorage.setItem("bloom_admin_auth", "true");
-      toast.success("Welcome back, Barista Lead!");
-    } else {
-      toast.error("Incorrect PIN. Default demo PIN is 1234");
+    if (!username.trim()) {
+      toast.error("Please enter the administrator username.");
+      return;
+    }
+    if (!password) {
+      toast.error("Please enter the master password.");
+      return;
+    }
+    if (lockoutRemaining > 0) {
+      toast.error(`Account locked. Please wait ${lockoutRemaining} seconds.`);
+      return;
+    }
+
+    setIsLoggingIn(true);
+    try {
+      const res = await authenticateAdmin(username, password);
+      if (res.success) {
+        setIsAuthenticated(true);
+        setPassword("");
+        setUsername("");
+        setAttemptsRemaining(undefined);
+        toast.success("Welcome back, Barista Lead & Admin!");
+      } else {
+        if (res.isLockedOut) {
+          setLockoutRemaining(res.remainingSeconds || 60);
+          toast.error(res.error || "Security lockout active. Please wait.");
+        } else {
+          setAttemptsRemaining(res.attemptsRemaining);
+          toast.error(res.error || "Incorrect username or password.");
+        }
+      }
+    } catch {
+      toast.error("An error occurred during authentication.");
+    } finally {
+      setIsLoggingIn(false);
     }
   };
 
   const handleLogout = () => {
     setIsAuthenticated(false);
-    sessionStorage.removeItem("bloom_admin_auth");
+    destroyAdminSession();
     toast.info("Logged out of Admin Portal");
+  };
+
+  const recoveryStrength = evaluatePasswordStrength(recoveryNewPassword);
+
+  const handleRecoverySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!recoveryKey.trim()) {
+      toast.error("Please enter the Emergency Recovery Key.");
+      return;
+    }
+    if (!recoveryNewUsername.trim()) {
+      toast.error("Please enter a new administrator username.");
+      return;
+    }
+    if (!recoveryStrength.isValid) {
+      toast.error("New password does not meet strength requirements.");
+      return;
+    }
+    if (recoveryNewPassword !== recoveryConfirmPassword) {
+      toast.error("New passwords do not match.");
+      return;
+    }
+
+    setIsRecovering(true);
+    try {
+      const res = await recoverWithRecoveryKey(recoveryKey, recoveryNewUsername, recoveryNewPassword);
+      if (res.success) {
+        setIsAuthenticated(true);
+        setIsRecoveryOpen(false);
+        setRecoveryKey("");
+        setRecoveryNewUsername("bloom_admin");
+        setRecoveryNewPassword("");
+        setRecoveryConfirmPassword("");
+        setLockoutRemaining(0);
+        toast.success("✨ Access Restored! Credentials have been reset.");
+      } else {
+        toast.error(res.error || "Invalid Emergency Recovery Key.");
+      }
+    } catch {
+      toast.error("An error occurred during recovery.");
+    } finally {
+      setIsRecovering(false);
+    }
   };
 
   const handleUpdateOrderStatus = (
@@ -380,77 +437,263 @@ function AdminPage() {
     return (
       <div className="flex min-h-[85vh] items-center justify-center bg-[#FAF6EE] px-4 py-16">
         <div className="w-full max-w-md rounded-3xl border border-[#E8DFD3] bg-white p-8 shadow-xl text-center space-y-6">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#2C3E2E] text-[#FAF6EE] shadow-md">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#2C3E2E] text-[#FAF6EE] shadow-md relative">
             <Lock className="h-6 w-6 text-[#D07A60]" />
+            <div className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-[#D07A60] text-white">
+              <ShieldCheck className="h-2.5 w-2.5" />
+            </div>
           </div>
 
           <div>
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FAF6EE] border border-[#E8DFD3] text-[10px] font-bold text-[#6D6964] uppercase tracking-wider mb-2">
+              <Shield className="h-3 w-3 text-emerald-600" />
+              <span>Cryptographic Guard Active</span>
+            </div>
             <h1 className="font-display text-2xl font-bold text-[#2C3E2E]">
               Bloom Staff & Barista Portal
             </h1>
             <p className="text-xs text-[#6D6964] mt-1">
-              Enter 4-digit barista PIN or click Quick Login to access POS Register, KDS, Floor Plan, Inventory & Daily Z-Reports.
+              Enter verified administrator username & master password to access POS Register, KDS, Floor Plan, Inventory & Controls.
             </p>
           </div>
 
-          <form onSubmit={handleLogin} className="space-y-4">
-            <input
-              type="password"
-              maxLength={4}
-              placeholder="Enter PIN (e.g. 1234)"
-              value={pin}
-              onChange={(e) => setPin(e.target.value)}
-              className="w-full text-center text-2xl tracking-[0.5em] font-mono rounded-2xl border border-[#E8DFD3] py-3 text-[#2C3E2E] focus:outline-none focus:border-[#2C3E2E]"
-            />
-
-            <div className="flex flex-col gap-2">
-              <Button
-                type="submit"
-                className="w-full rounded-full bg-[#2C3E2E] hover:bg-[#1E2B20] text-white py-3 text-xs font-bold uppercase tracking-wider cursor-pointer"
-              >
-                Unlock Dashboard
-              </Button>
-              <button
-                type="button"
-                onClick={() => {
-                  setPin("1234");
-                  setIsAuthenticated(true);
-                  sessionStorage.setItem("bloom_admin_auth", "true");
-                  toast.success("Quick Login as Manager Lead");
-                }}
-                className="text-xs text-[#D07A60] hover:underline font-semibold"
-              >
-                Demo 1-Click Quick Login
-              </button>
+          {/* Security Lockout Banner */}
+          {lockoutRemaining > 0 && (
+            <div className="rounded-2xl border border-rose-200 bg-rose-50 p-3.5 text-left text-xs space-y-1">
+              <div className="flex items-center gap-2 font-bold text-rose-800">
+                <ShieldAlert className="h-4 w-4 text-rose-600 shrink-0" />
+                <span>Security Lockout Active</span>
+              </div>
+              <p className="text-rose-700 text-[11px] leading-relaxed">
+                Too many failed login attempts. Authentication is temporarily locked for{" "}
+                <strong className="font-mono text-rose-900 font-extrabold">{lockoutRemaining}s</strong>.
+              </p>
             </div>
+          )}
+
+          {/* Attempts remaining warning */}
+          {attemptsRemaining !== undefined && attemptsRemaining > 0 && attemptsRemaining <= 3 && lockoutRemaining === 0 && (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-2.5 text-xs text-amber-800 font-semibold flex items-center justify-center gap-1.5">
+              <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
+              <span>{attemptsRemaining} attempts remaining before 60s security lockout</span>
+            </div>
+          )}
+
+          <form onSubmit={handleLogin} className="space-y-4 text-left">
+            {/* Username Input */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-[#2C3E2E] flex items-center gap-1.5">
+                <User className="h-3.5 w-3.5 text-[#D07A60]" />
+                <span>Administrator Username:</span>
+              </label>
+              <Input
+                type="text"
+                placeholder="e.g. bloom_admin"
+                value={username}
+                disabled={lockoutRemaining > 0 || isLoggingIn}
+                onChange={(e) => setUsername(e.target.value)}
+                className="bg-[#FAF6EE] border-[#E8DFD3] text-xs text-[#2C3E2E] h-11 font-medium"
+                autoFocus
+              />
+            </div>
+
+            {/* Password Input */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-[#2C3E2E] flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <Lock className="h-3.5 w-3.5 text-[#D07A60]" />
+                  <span>Master Password:</span>
+                </span>
+                {capsLockOn && (
+                  <span className="text-[10px] text-amber-600 font-semibold flex items-center gap-1">
+                    <AlertTriangle className="h-3 w-3" /> Caps Lock ON
+                  </span>
+                )}
+              </label>
+              <div className="relative">
+                <Input
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Enter master password..."
+                  value={password}
+                  disabled={lockoutRemaining > 0 || isLoggingIn}
+                  onChange={(e) => setPassword(e.target.value)}
+                  onKeyUp={(e) => setCapsLockOn(e.getModifierState("CapsLock"))}
+                  onKeyDown={(e) => setCapsLockOn(e.getModifierState("CapsLock"))}
+                  className="bg-[#FAF6EE] border-[#E8DFD3] pr-10 text-xs text-[#2C3E2E] h-11"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 cursor-pointer"
+                  tabIndex={-1}
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+            </div>
+
+            <Button
+              type="submit"
+              disabled={lockoutRemaining > 0 || isLoggingIn || !username.trim() || !password}
+              className="w-full rounded-full bg-[#2C3E2E] hover:bg-[#1E2B20] text-white py-3 text-xs font-bold uppercase tracking-wider cursor-pointer disabled:opacity-50"
+            >
+              {isLoggingIn ? "Verifying Credentials..." : lockoutRemaining > 0 ? `Locked (${lockoutRemaining}s)` : "Unlock Dashboard"}
+            </Button>
           </form>
 
-          {/* Magic Link Box */}
-          <div className="rounded-2xl border border-[#E8DFD3] bg-[#FAF6EE] p-3.5 text-left space-y-1.5">
+          {/* Default Credentials Notice */}
+          <div className="rounded-2xl border border-[#E8DFD3] bg-[#FAF6EE] p-3.5 text-left space-y-1.5 text-xs">
             <span className="text-[11px] font-bold uppercase tracking-wider text-[#2C3E2E] flex items-center gap-1.5">
-              <Sparkles className="h-3.5 w-3.5 text-[#D07A60]" /> Direct Instant Login Link:
+              <KeyRound className="h-3.5 w-3.5 text-[#D07A60]" /> Default Administrator Credentials:
             </span>
-            <div className="flex items-center gap-2">
-              <input
-                readOnly
-                value="http://localhost:8080/admin?auth=true"
-                className="w-full rounded-xl bg-white border border-[#E8DFD3] px-2.5 py-1.5 text-[11px] font-mono text-[#4A4642] select-all focus:outline-none"
-              />
-              <button
-                type="button"
-                onClick={() => {
-                  if (typeof navigator !== "undefined" && navigator.clipboard) {
-                    navigator.clipboard.writeText("http://localhost:8080/admin?auth=true");
-                    toast.success("Direct Login link copied to clipboard! 📋");
-                  }
-                }}
-                className="rounded-xl bg-[#2C3E2E] hover:bg-[#1E2B20] text-white px-3 py-1.5 text-[11px] font-bold shrink-0 cursor-pointer"
-              >
-                Copy
-              </button>
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="bg-white p-2 rounded-xl border border-[#E8DFD3]">
+                <span className="text-[10px] text-[#6D6964] block font-semibold">Username:</span>
+                <span className="font-mono font-bold text-[#2C3E2E]">bloom_admin</span>
+              </div>
+              <div className="bg-white p-2 rounded-xl border border-[#E8DFD3]">
+                <span className="text-[10px] text-[#6D6964] block font-semibold">Password:</span>
+                <span className="font-mono font-bold text-[#2C3E2E]">BloomCafe@2025!</span>
+              </div>
             </div>
+            <p className="text-[10px] text-[#6D6964] leading-tight pt-0.5">
+              Tip: You can customize username and password anytime in the <strong>Security & Access</strong> tab.
+            </p>
+          </div>
+
+          <div className="flex items-center justify-between text-xs pt-1 border-t border-[#F0EAE0]">
+            <button
+              type="button"
+              onClick={() => setIsRecoveryOpen(true)}
+              className="text-xs text-[#D07A60] hover:underline font-semibold cursor-pointer"
+            >
+              Forgot Credentials / Recovery?
+            </button>
+            <Link
+              to="/"
+              className="text-xs text-[#6D6964] hover:text-[#2C3E2E] underline font-medium"
+            >
+              ← Back to Website
+            </Link>
           </div>
         </div>
+
+        {/* Emergency Recovery Modal */}
+        {isRecoveryOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
+            <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl space-y-4 animate-in zoom-in-95">
+              <div className="flex items-center justify-between pb-2 border-b border-[#F0EAE0]">
+                <div className="flex items-center gap-2">
+                  <KeyRound className="h-5 w-5 text-[#D07A60]" />
+                  <h3 className="font-display text-lg font-bold text-[#2C3E2E]">
+                    Emergency Access Recovery
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsRecoveryOpen(false)}
+                  className="rounded-full p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 cursor-pointer"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              <p className="text-xs text-[#6D6964] leading-relaxed">
+                Enter your 16-character Emergency Recovery Key to securely reset the administrator credentials and restore access.
+              </p>
+
+              <form onSubmit={handleRecoverySubmit} className="space-y-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-[#2C3E2E]">
+                    Emergency Recovery Key:
+                  </label>
+                  <Input
+                    required
+                    placeholder="BLOOM-SEC-XXXX-XXXX"
+                    value={recoveryKey}
+                    onChange={(e) => setRecoveryKey(e.target.value.toUpperCase())}
+                    className="font-mono bg-[#FAF6EE] text-xs font-bold uppercase tracking-wider"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-[#2C3E2E]">
+                    New Administrator Username:
+                  </label>
+                  <Input
+                    required
+                    placeholder="e.g. bloom_admin"
+                    value={recoveryNewUsername}
+                    onChange={(e) => setRecoveryNewUsername(e.target.value)}
+                    className="bg-[#FAF6EE] text-xs font-mono font-bold"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-[#2C3E2E]">
+                    New Master Password:
+                  </label>
+                  <div className="relative">
+                    <Input
+                      type={showRecoveryPassword ? "text" : "password"}
+                      required
+                      placeholder="e.g. Melbourne#Roast2025!"
+                      value={recoveryNewPassword}
+                      onChange={(e) => setRecoveryNewPassword(e.target.value)}
+                      className="bg-[#FAF6EE] text-xs pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowRecoveryPassword(!showRecoveryPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    >
+                      {showRecoveryPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                  {recoveryNewPassword.length > 0 && (
+                    <div className="text-[10px] pt-1">
+                      <span className={`font-bold ${recoveryStrength.color}`}>
+                        Strength: {recoveryStrength.label} ({recoveryStrength.percentage}%)
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-[#2C3E2E]">
+                    Confirm New Password:
+                  </label>
+                  <Input
+                    type="password"
+                    required
+                    placeholder="Repeat new password..."
+                    value={recoveryConfirmPassword}
+                    onChange={(e) => setRecoveryConfirmPassword(e.target.value)}
+                    className="bg-[#FAF6EE] text-xs"
+                  />
+                </div>
+
+                <div className="flex gap-2 pt-2">
+                  <Button
+                    type="submit"
+                    disabled={isRecovering || !recoveryStrength.isValid || recoveryNewPassword !== recoveryConfirmPassword || !recoveryNewUsername.trim()}
+                    className="flex-1 rounded-full bg-[#2C3E2E] hover:bg-[#1E2B20] text-white text-xs font-bold py-2.5 cursor-pointer disabled:opacity-50"
+                  >
+                    {isRecovering ? "Resetting Access..." : "Reset Credentials"}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setIsRecoveryOpen(false)}
+                    className="rounded-full text-xs"
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -507,18 +750,6 @@ function AdminPage() {
               <span className="text-[11px] hidden sm:inline">{soundEnabled ? "Audio On" : "Muted"}</span>
             </button>
 
-            {/* Clear / Reset Data Action Button */}
-            <Button
-              onClick={() => setIsClearDataModalOpen(true)}
-              variant="outline"
-              size="sm"
-              className="rounded-full border-rose-400/50 bg-rose-500/20 text-rose-100 hover:bg-rose-600 hover:text-white text-xs flex items-center gap-1.5 cursor-pointer transition-all"
-              title="Clear or reset all café records and orders"
-            >
-              <RotateCcw className="h-3.5 w-3.5" />
-              <span>Clear Data</span>
-            </Button>
-
             <Link
               to="/"
               className="text-xs text-[#E4ECE6] hover:text-white underline font-medium"
@@ -529,7 +760,7 @@ function AdminPage() {
               onClick={handleLogout}
               variant="outline"
               size="sm"
-              className="rounded-full border-white/20 text-black hover:bg-white/10 text-xs"
+              className="rounded-full border-white/20 bg-white/10 text-white hover:bg-white/20 text-xs font-semibold"
             >
               Sign Out
             </Button>
@@ -596,7 +827,9 @@ function AdminPage() {
             { id: "floor", label: "🗺️ Floor Plan & Tables" },
             { id: "reservations", label: "📅 Reservations", count: reservations.length },
             { id: "inventory", label: "📦 Stock & 86'd Menu", count: soldOutItemIds.length > 0 ? `${soldOutItemIds.length} 86'd` : undefined },
+            { id: "staff", label: "👥 Staff Roster" },
             { id: "analytics", label: "📊 Sales & Z-Report" },
+            { id: "security", label: "🔐 Security & Access" },
             { id: "settings", label: "⚙️ Store Controls" },
           ].map((t) => (
             <button
@@ -856,7 +1089,7 @@ function AdminPage() {
                             onClick={() => handleUpdateOrderStatus(order.orderId, "completed")}
                             className="w-full rounded-full bg-[#2C3E2E] hover:bg-[#1E2B20] text-white text-xs font-bold cursor-pointer"
                           >
-                            Complete & Clear
+                            Complete Order
                           </Button>
                         )}
 
@@ -992,10 +1225,16 @@ function AdminPage() {
         {/* TAB 5: Unified Stock & 86'd Menu Hub */}
         {activeTab === "inventory" && <AdminInventory />}
 
-        {/* TAB 6: Sales Analytics & Daily Z-Report */}
+        {/* TAB 6: Staff Roster & Shift Duties */}
+        {activeTab === "staff" && <AdminStaffRoster />}
+
+        {/* TAB 7: Sales Analytics & Daily Z-Report */}
         {activeTab === "analytics" && <AdminAnalytics />}
 
-        {/* TAB 7: Store Live Settings & Data Reset */}
+        {/* TAB 8: Security & Access Control */}
+        {activeTab === "security" && <AdminSecurity onLogout={handleLogout} />}
+
+        {/* TAB 9: Store Live Settings */}
         {activeTab === "settings" && (
           <div className="space-y-6 max-w-2xl mx-auto">
             <div>
@@ -1072,38 +1311,6 @@ function AdminPage() {
                   rows={2}
                   className="w-full rounded-xl border border-[#E8DFD3] bg-[#FAF6EE] p-3 text-xs text-[#2C3E2E]"
                 />
-              </div>
-
-              {/* Data Management & Database Reset Section */}
-              <div className="pt-4 border-t border-[#F0EAE0] space-y-3">
-                <div>
-                  <h4 className="font-display text-sm font-bold text-[#2C3E2E] flex items-center gap-1.5">
-                    <RotateCcw className="h-4 w-4 text-rose-600" />
-                    <span>Database & Demo Records Management</span>
-                  </h4>
-                  <p className="text-xs text-[#6D6964]">
-                    Clear active orders, shopping carts, table reservations, and restore default stock counts.
-                  </p>
-                </div>
-
-                <div className="flex flex-wrap gap-2.5 pt-1">
-                  <Button
-                    onClick={() => handleClearAllData("reset-defaults")}
-                    variant="outline"
-                    className="rounded-full border-[#E8DFD3] hover:bg-[#FAF6EE] text-xs font-bold text-[#2C3E2E] flex items-center gap-1.5 cursor-pointer"
-                  >
-                    <RotateCcw className="h-3.5 w-3.5 text-[#D07A60]" />
-                    <span>Reset Demo Defaults</span>
-                  </Button>
-
-                  <Button
-                    onClick={() => handleClearAllData("wipe-all")}
-                    className="rounded-full bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                    <span>Wipe All Tickets & Orders</span>
-                  </Button>
-                </div>
               </div>
             </div>
           </div>
@@ -1263,64 +1470,6 @@ function AdminPage() {
                 className="rounded-full border-[#E8DFD3] text-xs font-semibold"
               >
                 Back
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Clear Data Confirmation Modal */}
-      {isClearDataModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl space-y-4 animate-in zoom-in-95">
-            <div className="flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-rose-100 text-rose-700 shrink-0">
-                <Trash2 className="h-6 w-6" />
-              </div>
-              <div>
-                <h3 className="font-display text-lg font-bold text-[#2C3E2E]">
-                  Clear & Reset Café Data?
-                </h3>
-                <p className="text-xs text-[#6D6964]">
-                  Choose how you'd like to clear or reset the application data.
-                </p>
-              </div>
-            </div>
-
-            <div className="rounded-2xl bg-[#FAF6EE] border border-[#E8DFD3] p-4 text-xs text-[#4A4642] space-y-2 leading-relaxed">
-              <p><strong>This action allows you to:</strong></p>
-              <ul className="list-disc pl-4 space-y-1 text-[#6D6964]">
-                <li>Clear shopping cart & active customer orders</li>
-                <li>Reset the Kitchen Display (KDS) queue</li>
-                <li>Reset table bookings & walk-in seating</li>
-                <li>Restore inventory stock levels & floor statuses</li>
-                <li>Clear sold-out (86'd) item flags</li>
-              </ul>
-            </div>
-
-            <div className="flex flex-col gap-2 pt-2">
-              <Button
-                onClick={() => handleClearAllData("reset-defaults")}
-                className="w-full rounded-full bg-[#2C3E2E] hover:bg-[#1E2B20] text-white text-xs font-bold flex items-center justify-center gap-2 py-2.5 cursor-pointer"
-              >
-                <RotateCcw className="h-4 w-4 text-[#D07A60]" />
-                <span>Reset to Clean Demo Records (Recommended)</span>
-              </Button>
-
-              <Button
-                onClick={() => handleClearAllData("wipe-all")}
-                className="w-full rounded-full bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold flex items-center justify-center gap-2 py-2.5 cursor-pointer"
-              >
-                <Trash2 className="h-4 w-4" />
-                <span>Wipe Everything Completely Clean</span>
-              </Button>
-
-              <Button
-                onClick={() => setIsClearDataModalOpen(false)}
-                variant="outline"
-                className="w-full rounded-full border-[#E8DFD3] text-xs font-semibold py-2"
-              >
-                Cancel
               </Button>
             </div>
           </div>

@@ -18,7 +18,7 @@ interface AdminNotificationDrawerProps {
 }
 
 export function AdminNotificationDrawer({ isOpen, onClose }: AdminNotificationDrawerProps) {
-  const { notifications, markNotificationAsRead, clearNotifications } = useApp();
+  const { notifications, markNotificationAsRead } = useApp();
 
   if (!isOpen) return null;
 
@@ -129,21 +129,11 @@ export function AdminNotificationDrawer({ isOpen, onClose }: AdminNotificationDr
         </div>
 
         {/* Footer actions */}
-        <div className="pt-4 border-t border-gray-100 flex items-center justify-between">
-          <Button
-            onClick={clearNotifications}
-            variant="ghost"
-            size="sm"
-            className="text-xs text-rose-600 hover:bg-rose-50 flex items-center gap-1.5"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-            <span>Clear Notification History</span>
-          </Button>
-
+        <div className="pt-4 border-t border-gray-100 flex items-center justify-end">
           <Button
             onClick={onClose}
             size="sm"
-            className="rounded-full bg-[#2C3E2E] text-white text-xs font-bold px-4"
+            className="rounded-full bg-[#2C3E2E] text-white text-xs font-bold px-6 cursor-pointer hover:bg-[#1E2B20]"
           >
             Done
           </Button>
